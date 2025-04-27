@@ -4,6 +4,8 @@ import requests
 import inspect
 import pandas as pd
 
+from smolagents import CodeAgent, DuckDuckGoSearchTool, OpenAIServerModel
+
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
@@ -11,15 +13,22 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
-    def __init__(self):
+    def __init__(self, openai_key):
+        self.openai_key = openai_key
         print("BasicAgent initialized.")
+        model = OpenAIServerModel(model_id="gpt-4.1", api_key=self.openai_key)
+        search_tool = DuckDuckGoSearchTool()
+        self.agent = CodeAgent(
+            model = model,
+            tools=[search_tool]
+        )
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
         fixed_answer = "This is a default answer."
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer
 
-def run_and_submit_all( profile: gr.OAuthProfile | None):
+def run_and_submit_all( profile: gr.OAuthProfile | None, openai_key: str):
     """
     Fetches all questions, runs the BasicAgent on them, submits all answers,
     and displays the results.
@@ -40,7 +49,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = BasicAgent(openai_key)
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
