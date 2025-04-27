@@ -4,20 +4,49 @@ import requests
 import inspect
 import pandas as pd
 
+# my imports
+from llama_index.agent import OpenAIAgent
+from llama_index.tools.duckduckgo import DuckDuckGoSearchTool
+from llama_index.llms import OpenAI
+
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
+prompt = ('''You are a general AI assistant. I will ask you a question. 
+Report your thoughts, and finish your answer with the following template: 
+FINAL ANSWER: [YOUR FINAL ANSWER]. YOUR FINAL ANSWER should be a number OR 
+as few words as possible OR a comma separated list of numbers and/or strings. 
+If you are asked for a number, don't use comma to write your number neither 
+use units such as $ or percent sign unless specified otherwise. 
+If you are asked for a string, don't use articles, neither abbreviations 
+(e.g. for cities), and write the digits in plain text unless specified otherwise. 
+If you are asked for a comma separated list, apply the above rules depending of 
+whether the element to be put in the list is a number or a string.
+''')
+
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
-    def __init__(self):
-        print("BasicAgent initialized.")
+class MyAgent:
+    def __init__(self, model_name: str = "gpt-4o"):
+        # Initialize LLM
+        self.llm = OpenAI(model=model_name)
+        
+        # Initialize DuckDuckGo search tool
+        self.search_tool = DuckDuckGoSearchTool()
+        
+        # Create the agent
+        self.agent = OpenAIAgent.from_tools(
+            tools=[self.search_tool],
+            llm=self.llm,
+            system_prompt=prompt,
+        )
+
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        """Ask a question to the agent."""
+        response = self.agent.chat(question)
+        return response.response
+
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -40,7 +69,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = MyAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
