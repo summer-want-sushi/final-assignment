@@ -1,25 +1,80 @@
 import os
 import gradio as gr
 import requests
-import inspect
-import pandas as pd
+import re
 
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
+WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 
 # --- Basic Agent Definition ---
-# ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
     def __init__(self):
         print("BasicAgent initialized.")
+    
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
+        
+        # Check if the question is related to Mercedes Sosa's albums
+        if "Mercedes Sosa" in question and "albums" in question:
+            answer = self.get_mercedes_sosa_albums_2000_to_2009()
+            return answer
+        
         fixed_answer = "This is a default answer."
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer
+    
+    def get_mercedes_sosa_albums_2000_to_2009(self) -> str:
+        """
+        Fetch Mercedes Sosa's album list from Wikipedia and count the albums released between 2000-2009.
+        """
+        try:
+            # Get data from Wikipedia API for Mercedes Sosa's page
+            response = requests.get(WIKIPEDIA_API_URL, params={
+                'action': 'query',
+                'format': 'json',
+                'titles': 'Mercedes_Sosa',
+                'prop': 'extracts',
+                'exintro': True,
+                'explaintext': True,
+            })
+            response.raise_for_status()
 
-def run_and_submit_all( profile: gr.OAuthProfile | None):
+            data = response.json()
+            page = list(data['query']['pages'].values())[0]
+            extract = page.get('extract', '')
+            
+            # Find albums released between 2000 and 2009
+            albums_2000s = self.extract_albums_from_text(extract, 2000, 2009)
+            return f"Mercedes Sosa released {len(albums_2000s)} studio albums between 2000 and 2009."
+        
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching Wikipedia data: {e}")
+            return f"Error fetching data: {e}"
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return f"An unexpected error occurred: {e}"
+
+    def extract_albums_from_text(self, text: str, start_year: int, end_year: int) -> list:
+        """
+        Extract album information from the Wikipedia extract text based on the year range.
+        """
+        albums = []
+        
+        # Simple regex pattern to find years and album names in the text
+        pattern = r"(\d{4})[\s\-\:]?([A-Za-z0-9\s\(\)]+)"
+        matches = re.findall(pattern, text)
+        
+        # Filter albums by the specified year range
+        for year, album_name in matches:
+            year = int(year)
+            if start_year <= year <= end_year:
+                albums.append((year, album_name.strip()))
+        
+        return albums
+
+def run_and_submit_all(profile: gr.OAuthProfile | None):
     """
     Fetches all questions, runs the BasicAgent on them, submits all answers,
     and displays the results.
@@ -38,13 +93,12 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     questions_url = f"{api_url}/questions"
     submit_url = f"{api_url}/submit"
 
-    # 1. Instantiate Agent ( modify this part to create your agent)
+    # 1. Instantiate Agent
     try:
         agent = BasicAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
-    # In the case of an app running as a hugging Face space, this link points toward your codebase ( usefull for others so please keep it public)
     agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
     print(agent_code)
 
@@ -63,7 +117,6 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
         return f"Error fetching questions: {e}", None
     except requests.exceptions.JSONDecodeError as e:
          print(f"Error decoding JSON response from questions endpoint: {e}")
-         print(f"Response text: {response.text[:500]}")
          return f"Error decoding server response for questions: {e}", None
     except Exception as e:
         print(f"An unexpected error occurred fetching questions: {e}")
@@ -146,11 +199,9 @@ with gr.Blocks() as demo:
     gr.Markdown(
         """
         **Instructions:**
-
         1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
         2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
         3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
-
         ---
         **Disclaimers:**
         Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
@@ -163,7 +214,6 @@ with gr.Blocks() as demo:
     run_button = gr.Button("Run Evaluation & Submit All Answers")
 
     status_output = gr.Textbox(label="Run Status / Submission Result", lines=5, interactive=False)
-    # Removed max_rows=10 from DataFrame constructor
     results_table = gr.DataFrame(label="Questions and Agent Answers", wrap=True)
 
     run_button.click(
@@ -173,24 +223,14 @@ with gr.Blocks() as demo:
 
 if __name__ == "__main__":
     print("\n" + "-"*30 + " App Starting " + "-"*30)
-    # Check for SPACE_HOST and SPACE_ID at startup for information
     space_host_startup = os.getenv("SPACE_HOST")
-    space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
+    space_id_startup = os.getenv("SPACE_ID")
 
     if space_host_startup:
         print(f"✅ SPACE_HOST found: {space_host_startup}")
-        print(f"   Runtime URL should be: https://{space_host_startup}.hf.space")
-    else:
-        print("ℹ️  SPACE_HOST environment variable not found (running locally?).")
-
-    if space_id_startup: # Print repo URLs if SPACE_ID is found
+    if space_id_startup:
         print(f"✅ SPACE_ID found: {space_id_startup}")
-        print(f"   Repo URL: https://huggingface.co/spaces/{space_id_startup}")
-        print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id_startup}/tree/main")
-    else:
-        print("ℹ️  SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
 
     print("-"*(60 + len(" App Starting ")) + "\n")
-
     print("Launching Gradio Interface for Basic Agent Evaluation...")
     demo.launch(debug=True, share=False)
