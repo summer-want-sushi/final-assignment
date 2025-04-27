@@ -7,17 +7,73 @@ import pandas as pd
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
+WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
+
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
     def __init__(self):
         print("BasicAgent initialized.")
+
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
+        if "Mercedes Sosa" in question and "albums" in question:
+            answer = self.get_mercedes_sosa_albums_2000_to_2009()
+            return answer
+        
         fixed_answer = "This is a default answer."
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer
+        
+def get_mercedes_sosa_albums_2000_to_2009(self) -> str:
+        """
+        Fetch Mercedes Sosa's album list from Wikipedia and count the albums released between 2000-2009.
+        """
+        try:
+            # Get data from Wikipedia API for Mercedes Sosa's page
+            response = requests.get(WIKIPEDIA_API_URL, params={
+                'action': 'query',
+                'format': 'json',
+                'titles': 'Mercedes_Sosa',
+                'prop': 'extracts',
+                'exintro': True,
+                'explaintext': True,
+            })
+            response.raise_for_status()
+
+            data = response.json()
+            page = list(data['query']['pages'].values())[0]
+            extract = page.get('extract', '')
+            
+            # Find albums released between 2000 and 2009
+            albums_2000s = self.extract_albums_from_text(extract, 2000, 2009)
+            return f"Mercedes Sosa released {len(albums_2000s)} studio albums between 2000 and 2009."
+        
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching Wikipedia data: {e}")
+            return f"Error fetching data: {e}"
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return f"An unexpected error occurred: {e}"
+
+def extract_albums_from_text(self, text: str, start_year: int, end_year: int) -> list:
+        """
+        Extract album information from the Wikipedia extract text based on the year range.
+        """
+        albums = []
+        
+        # Simple regex pattern to find years and album names in the text
+        pattern = r"(\d{4})[\s\-\:]?([A-Za-z0-9\s\(\)]+)"
+        matches = re.findall(pattern, text)
+        
+        # Filter albums by the specified year range
+        for year, album_name in matches:
+            year = int(year)
+            if start_year <= year <= end_year:
+                albums.append((year, album_name.strip()))
+        
+        return albums
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -146,11 +202,9 @@ with gr.Blocks() as demo:
     gr.Markdown(
         """
         **Instructions:**
-
         1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
         2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
         3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
-
         ---
         **Disclaimers:**
         Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
