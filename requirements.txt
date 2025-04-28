@@ -1,2 +1,5 @@
+smolagents
 gradio
 requests
+pandas
+openai
