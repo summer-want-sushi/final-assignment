@@ -1,2 +1,6 @@
 gradio
 requests
+smolagents>=0.2.0
+duckduckgo_search
+pytesseract     # if you need OCR
+pillow
