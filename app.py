@@ -4,20 +4,79 @@ import requests
 import inspect
 import pandas as pd
 
+from agnos.llms import HuggingFaceLLM
+from agnos.agent import Agent
+from agnos.toolkit import (
+    PDFReader, CSVReader, ExcelReader, TextReader, XMLReader,
+    AudioTranscriber, ImageCaptioner, VideoAnalyzer
+)
+
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+# class BasicAgent:
+#     def __init__(self):
+#         print("BasicAgent initialized.")
+#     def __call__(self, question: str) -> str:
+#         print(f"Agent received question (first 50 chars): {question[:50]}...")
+#         fixed_answer = "This is a default answer."
+#         print(f"Agent returning fixed answer: {fixed_answer}")
+#         return fixed_answer
+
+
 class BasicAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+        print("Initializing LangGraph-powered agent...")
+
+        # System prompt as per GAIA spec
+        system_prompt = (
+            "You are a general AI assistant. I will ask you a question. Report your thoughts, "
+            "and finish your answer with the following template: FINAL ANSWER: [YOUR FINAL ANSWER]. "
+            "YOUR FINAL ANSWER should be a number OR as few words as possible OR a comma separated list "
+            "of numbers and/or strings. If you are asked for a number, don't use comma to write your number "
+            "neither use units such as $ or percent sign unless specified otherwise. If you are asked for a string, "
+            "don't use articles, neither abbreviations (e.g. for cities), and write the digits in plain text unless "
+            "specified otherwise. If you are asked for a comma separated list, apply the above rules depending of "
+            "whether the element to be put in the list is a number or a string."
+        )
+
+        # Choose your model from Hugging Face (change if needed)
+        self.llm = HuggingFaceLLM("meta-llama/Meta-Llama-3.1-8B-Instruct", system_prompt=system_prompt)
+
+        # Attach tools
+        self.agent = Agent(
+            llm=self.llm,
+            tools=[
+                PDFReader(),
+                CSVReader(),
+                ExcelReader(),
+                TextReader(),
+                XMLReader(),
+                AudioTranscriber(),
+                ImageCaptioner(),
+                VideoAnalyzer()
+            ]
+        )
+
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+
+        try:
+            result = self.agent.run(question)
+            print(f"Raw result: {result}")
+            if "FINAL ANSWER:" in result:
+                final_answer = result.split("FINAL ANSWER:")[-1].strip().split("\n")[0]
+                print(f"Agent returning final answer: {final_answer}")
+                return final_answer
+            else:
+                return "Could not extract final answer."
+        except Exception as e:
+            print("Error during agent execution.")
+            return f"AGENT ERROR: {e}"
+
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
