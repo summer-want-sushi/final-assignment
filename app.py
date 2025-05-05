@@ -3,6 +3,8 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from smolagents import HfApiModel,CodeAgent,PythonInterpreterTool, UserInputTool, FinalAnswerTool, DuckDuckGoSearchTool, WikipediaSearchTool, WolframAlphaTool, VisitWebpageTool, SpeechToTextTool
+
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -12,10 +14,31 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+
+        model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct", provider="together")
+        self.agent = CodeAgent(
+            model=model,
+            tools=[
+                PythonInterpreterTool(),
+                UserInputTool(),
+                FinalAnswerTool(),
+                DuckDuckGoSearchTool(),
+                WikipediaSearchTool(),
+                WolframAlphaTool(),
+                VisitWebpageTool(),
+                SpeechToTextTool()
+            ],
+            max_tokens=2000,
+            temperature=0.5,
+            top_p=0.9,
+            top_k=50,
+            frequency_penalty=0.5,
+            presence_penalty=0.5,
+        )
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
+        fixed_answer = self.agent.run(question)
+        # Here you can add any post-processing to the answer if needed
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer
 
