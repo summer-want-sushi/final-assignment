@@ -3,6 +3,8 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from agent import AmbiguityClassifier
+import json
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -11,13 +13,44 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
+    """A langgraph agent that detects and classifies ambiguities in user stories."""
     def __init__(self):
         print("BasicAgent initialized.")
+        self.analizar_historia = AmbiguityClassifier()
+      
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        try:
+            resultado = self.analizar_historia(question)
+            
+            # Formatear la respuesta
+            respuesta = []
+            if resultado["tiene_ambiguedad"]:
+                respuesta.append("Se encontraron las siguientes ambigüedades:")
+                
+                if resultado["ambiguedad_lexica"]:
+                    respuesta.append("\nAmbigüedades léxicas:")
+                    for amb in resultado["ambiguedad_lexica"]:
+                        respuesta.append(f"- {amb}")
+                
+                if resultado["ambiguedad_sintactica"]:
+                    respuesta.append("\nAmbigüedades sintácticas:")
+                    for amb in resultado["ambiguedad_sintactica"]:
+                        respuesta.append(f"- {amb}")
+                
+                respuesta.append(f"\nScore de ambigüedad: {resultado['score_ambiguedad']}")
+                respuesta.append("\nSugerencias de mejora:")
+                for sug in resultado["sugerencias"]:
+                    respuesta.append(f"- {sug}")
+            else:
+                respuesta.append("No se encontraron ambigüedades en la historia de usuario.")
+                respuesta.append(f"Score de ambigüedad: {resultado['score_ambiguedad']}")
+            
+            return "\n".join(respuesta)
+        except Exception as e:
+            error_msg = f"Error analizando la historia: {str(e)}"
+            print(error_msg)
+            return error_msg
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -139,37 +172,113 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
         results_df = pd.DataFrame(results_log)
         return status_message, results_df
 
+# Inicializar el clasificador
+classifier = AmbiguityClassifier()
 
-# --- Build Gradio Interface using Blocks ---
-with gr.Blocks() as demo:
-    gr.Markdown("# Basic Agent Evaluation Runner")
-    gr.Markdown(
-        """
-        **Instructions:**
+def analyze_user_story(user_story: str) -> str:
+    """Analiza una historia de usuario y retorna los resultados formateados."""
+    if not user_story.strip():
+        return "Por favor, ingrese una historia de usuario para analizar."
+    
+    # Analizar la historia
+    result = classifier(user_story)
+    
+    # Formatear resultados
+    output = []
+    output.append(f"📝 Historia analizada:\n{user_story}\n")
+    output.append(f"🎯 Score de ambigüedad: {result['score_ambiguedad']}")
+    
+    if result['ambiguedad_lexica']:
+        output.append("\n📚 Ambigüedades léxicas encontradas:")
+        for amb in result['ambiguedad_lexica']:
+            output.append(f"• {amb}")
+    
+    if result['ambiguedad_sintactica']:
+        output.append("\n🔍 Ambigüedades sintácticas encontradas:")
+        for amb in result['ambiguedad_sintactica']:
+            output.append(f"• {amb}")
+    
+    if result['sugerencias']:
+        output.append("\n💡 Sugerencias de mejora:")
+        for sug in result['sugerencias']:
+            output.append(f"• {sug}")
+    
+    return "\n".join(output)
 
-        1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
-        2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
-        3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
+def analyze_multiple_stories(user_stories: str) -> str:
+    """Analiza múltiples historias de usuario separadas por líneas."""
+    if not user_stories.strip():
+        return "Por favor, ingrese al menos una historia de usuario para analizar."
+    
+    stories = [s.strip() for s in user_stories.split('\n') if s.strip()]
+    all_results = []
+    
+    for i, story in enumerate(stories, 1):
+        result = classifier(story)
+        story_result = {
+            "historia": story,
+            "score": result['score_ambiguedad'],
+            "ambiguedades_lexicas": result['ambiguedad_lexica'],
+            "ambiguedades_sintacticas": result['ambiguedad_sintactica'],
+            "sugerencias": result['sugerencias']
+        }
+        all_results.append(story_result)
+    
+    return json.dumps(all_results, indent=2, ensure_ascii=False)
 
-        ---
-        **Disclaimers:**
-        Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
-        This space provides a basic setup and is intentionally sub-optimal to encourage you to develop your own, more robust solution. For instance for the delay process of the submit button, a solution could be to cache the answers and submit in a seperate action or even to answer the questions in async.
-        """
-    )
-
-    gr.LoginButton()
-
-    run_button = gr.Button("Run Evaluation & Submit All Answers")
-
-    status_output = gr.Textbox(label="Run Status / Submission Result", lines=5, interactive=False)
-    # Removed max_rows=10 from DataFrame constructor
-    results_table = gr.DataFrame(label="Questions and Agent Answers", wrap=True)
-
-    run_button.click(
-        fn=run_and_submit_all,
-        outputs=[status_output, results_table]
-    )
+# Crear la interfaz
+with gr.Blocks(title="Detector de Ambigüedades en Historias de Usuario") as demo:
+    gr.Markdown("""
+    # 🔍 Detector de Ambigüedades en Historias de Usuario
+    
+    Esta herramienta analiza historias de usuario en busca de ambigüedades léxicas y sintácticas, 
+    proporcionando sugerencias para mejorarlas.
+    
+    ## 📝 Instrucciones:
+    1. Ingrese una historia de usuario en el campo de texto
+    2. Haga clic en "Analizar"
+    3. Revise los resultados y las sugerencias de mejora
+    """)
+    
+    with gr.Tab("Análisis Individual"):
+        input_text = gr.Textbox(
+            label="Historia de Usuario",
+            placeholder="Como usuario quiero...",
+            lines=3
+        )
+        analyze_btn = gr.Button("Analizar")
+        output = gr.Textbox(
+            label="Resultados del Análisis",
+            lines=10
+        )
+        analyze_btn.click(
+            analyze_user_story,
+            inputs=[input_text],
+            outputs=[output]
+        )
+    
+    with gr.Tab("Análisis Múltiple"):
+        input_stories = gr.Textbox(
+            label="Historias de Usuario (una por línea)",
+            placeholder="Como usuario quiero...\nComo administrador necesito...",
+            lines=5
+        )
+        analyze_multi_btn = gr.Button("Analizar Todas")
+        output_json = gr.JSON(label="Resultados del Análisis")
+        analyze_multi_btn.click(
+            analyze_multiple_stories,
+            inputs=[input_stories],
+            outputs=[output_json]
+        )
+    
+    gr.Markdown("""
+    ## 🚀 Ejemplos de Uso
+    
+    Pruebe con estas historias de usuario:
+    - Como usuario quiero un sistema rápido y eficiente para gestionar mis tareas
+    - El sistema debe permitir exportar varios tipos de archivos
+    - Como administrador necesito acceder fácilmente a los reportes
+    """)
 
 if __name__ == "__main__":
     print("\n" + "-"*30 + " App Starting " + "-"*30)
