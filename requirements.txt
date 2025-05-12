@@ -1,2 +1,9 @@
-gradio
+gradio==5.25.2
+transformers
+torch
+accelerate
+duckduckgo-search
+python-dotenv
+pandas
 requests
+numpy
