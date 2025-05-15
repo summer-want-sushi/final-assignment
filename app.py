@@ -10,14 +10,32 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
+import openai
+
+class SmartAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that gives exact, factual answers only."},
+                    {"role": "user", "content": question}
+                ],
+                max_tokens=200,
+                temperature=0.0,
+            )
+            answer = response["choices"][0]["message"]["content"].strip()
+            return self.clean_answer(answer)
+        except Exception as e:
+            print(f"OpenAI Error: {e}")
+            return "ERROR"
+
+    def clean_answer(self, answer: str) -> str:
+        # Remove possible prefixes like "Answer:" or "FINAL ANSWER:"
+        return answer.replace("FINAL ANSWER:", "").replace("Answer:", "").strip()
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -40,7 +58,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = SmartAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
