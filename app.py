@@ -10,14 +10,51 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+# --- Enhanced Agent for GAIA ---
+
+
+from smole_agent.agent import SmoleAgent
+from smole_agent.tools import WebSearchTool, ImageCaptioningTool
+from smole_agent.tools import Tool
+
 class BasicAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+        print("BasicAgent initializing with tools...")
+
+       
+        self.agent = SmoleAgent.from_pretrained("smol-ai/smole-agent")
+
+       
+        self.agent.add_tool(WebSearchTool())
+        self.agent.add_tool(ImageCaptioningTool()) 
+
+        print("BasicAgent ready.")
+
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        try:
+            print(f"BasicAgent received question: {question[:50]}...")
+            result = self.agent.run({
+                "question": question,
+                "tools": ["search", "image_captioning"],
+                "context": "Answer using available tools like search or captioning"
+            })
+            return result
+        except Exception as e:
+            print(f"Agent failed: {e}")
+            return f"Error processing question: {e}"
+
+            
+
+class VideoSummaryTool(Tool):
+    name = "video_summary"
+    description = "Summarize the content of a video from a URL."
+
+    def run(self, input: str) -> str:
+        # Just a mock-up
+        return f"Summary of video at {input} (fake response)."
+
+
+
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
