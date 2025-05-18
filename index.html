@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fraud Detection Chatbot</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f1f2f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+    }
+
+    h2 {
+      margin: 20px;
+      color: #333;
+    }
+
+    #chat-box {
+      width: 90%;
+      max-width: 600px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-grow: 1;
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .msg {
+      margin-bottom: 10px;
+      padding: 10px 14px;
+      border-radius: 20px;
+      max-width: 80%;
+      word-wrap: break-word;
+      line-height: 1.4;
+    }
+
+    .bot {
+      background-color: #e9ecef;
+      align-self: flex-start;
+      color: #333;
+    }
+
+    .user {
+      background-color: #0d6efd;
+      color: white;
+      align-self: flex-end;
+    }
+
+    #input-bar {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ddd;
+      background: #f9f9f9;
+    }
+
+    #input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      outline: none;
+      margin-right: 10px;
+    }
+
+    #send-btn, #upload-btn {
+      background-color: #0d6efd;
+      color: white;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+
+    #fileInput {
+      margin: 10px 0;
+    }
+
+    @media (max-width: 600px) {
+      #chat-box {
+        width: 95%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>💬 Fraud Detection Chatbot</h2>
+
+  <div id="chat-box">
+    <div id="messages"></div>
+
+    <div style="padding: 10px; text-align: center;">
+      <input type="file" id="fileInput">
+      <button id="upload-btn" onclick="uploadFile()">Upload CSV</button>
+    </div>
+
+    <div id="input-bar">
+      <input id="input" type="text" placeholder="Type your message...">
+      <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const messages = document.getElementById("messages");
+
+    function addMessage(text, sender) {
+      const msg = document.createElement("div");
+      msg.className = `msg ${sender}`;
+      msg.textContent = text;
+      messages.appendChild(msg);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("input");
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, "user");
+      input.value = "";
+
+      const res = await fetch("http://127.0.0.1:8000/chat/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+
+      const data = await res.json();
+      addMessage(data.response, "bot");
+    }
+
+    async function uploadFile() {
+      const file = document.getElementById("fileInput").files[0];
+      if (!file) {
+        alert("Please select a CSV file first.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      addMessage("🔄 Analyzing your file...", "bot");
+
+      const res = await fetch("http://127.0.0.1:8000/upload/", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      addMessage(data.response, "bot");
+    }
+async function uploadFile() {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) {
+    alert("Please select a CSV file first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  addMessage("🔄 Analyzing your file...", "bot");
+
+  try {
+    const res = await fetch("http://127.0.0.1:8000/upload/", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    addMessage(data.response || "No response from server.", "bot");
+  } catch (err) {
+    addMessage(`❌ Error: ${err.message}`, "bot");
+  }
+}
+  </script>
+</body>
+</html>
+

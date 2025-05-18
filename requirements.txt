@@ -1,2 +1,9 @@
-gradio
-requests
+pip~=25.1.1
+pillow~=11.2.1
+filelock~=3.18.0
+pandas~=2.2.3
+fastapi~=0.115.12
+pydantic~=2.11.4
+scikit-learn~=1.6.1
+smolagents~=1.16.0
+uvicorn
