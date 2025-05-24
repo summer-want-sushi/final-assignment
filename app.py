@@ -11,11 +11,22 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
 class BasicAgent:
-    def __init__(self):
+    def __init__(self, openai_key):
+        self.openai_key = openai_key
         print("BasicAgent initialized.")
+        # Initialize the model
+        #model = HfApiModel()
+        model = OpenAIServerModel(model_id="gpt-4.1", api_key=self.openai_key)
+        # Initialize the search tool
+        search_tool = DuckDuckGoSearchTool()
+        # Initialize Agent
+        self.agent = CodeAgent(
+            model = model,
+            tools=[search_tool]
+        )
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
+        fixed_answer =self.agent.run(question)
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer
 
