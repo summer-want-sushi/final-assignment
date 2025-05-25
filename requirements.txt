@@ -1,2 +1,5 @@
 gradio
 requests
+crewai
+langchain
+openai
