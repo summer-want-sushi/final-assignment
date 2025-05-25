@@ -1,2 +1,4 @@
-gradio
-requests
+transformers>=4.40
+accelerate
+torch
+Pillow
