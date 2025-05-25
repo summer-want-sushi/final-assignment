@@ -1,2 +1,7 @@
 gradio
+transformers
+duckduckgo_search
+torch
+Pillow
+beautifulsoup4
 requests
