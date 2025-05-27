@@ -3,6 +3,9 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from smolagents import CodeAgent,DuckDuckGoSearchTool, HfApiModel,load_tool,tool
+from langchain_openai import ChatOpenAI
+
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -10,6 +13,27 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+
+model = ChatOpenAI(temperature=0)
+
+from smolagents import DuckDuckGoSearchTool, LiteLLMModel, ToolCallingAgent
+ 
+
+# Create web agent and manager agent structure
+web_agent = ToolCallingAgent(
+    tools=[DuckDuckGoSearchTool()],           # Add required tools
+    model=model,         # Add model
+    max_steps=5,        # Adjust steps
+    name="My browser",           # Add name
+    description="Searching is easy"      # Add description
+)
+
+query = "What are the latest updates on Mars exploration?"
+response = web_agent.run(query)
+print(response)
+
+
+
 class BasicAgent:
     def __init__(self):
         print("BasicAgent initialized.")
