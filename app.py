@@ -3,6 +3,8 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from smolagents import CodeAgent, OpenAIServerModel, DuckDuckGoSearchTool
+from functools import lru_cache
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -10,14 +12,32 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
+class SmartAgent:
     def __init__(self):
         print("BasicAgent initialized.")
+        self.agent = CodeAgent(
+          llm=OpenAIServerModel(model_id="gpt-4o"),
+        tools=[DuckDuckGoSearchTool()]
+   # def __call__(self, question: str) -> str:
+   #    print(f"Agent received question (first 50 chars): {question[:50]}...")
+   #   fixed_answer = "This is a default answer."
+   #  print(f"Agent returning fixed answer: {fixed_answer}")
+   #     return fixed_answer
+
+  @lru_cache(maxsize=100)
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        # Step 1: Use web search for factual questions
+        if self._needs_search(question):
+            return DuckDuckGoSearchTool().run(question)
+        # Step 2: Use GPT-4o for complex questions
+        return self.agent.run(question)
+
+    def _needs_search(self, question: str) -> bool:
+        prompt = f"""
+        Should this question use web search? Answer "yes" or "no":
+        Question: "{question}"
+        """
+        return "yes" in self.agent.run(prompt).lower()
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -40,7 +60,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = SmartAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
