@@ -1,8 +1,10 @@
 import os
 import gradio as gr
 import requests
-import inspect
 import pandas as pd
+from dotenv.main import load_dotenv
+import agent
+import asyncio
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -10,20 +12,15 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
-    def __init__(self):
-        print("BasicAgent initialized.")
-    def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
     Fetches all questions, runs the BasicAgent on them, submits all answers,
     and displays the results.
     """
+
+    load_dotenv()
+
     # --- Determine HF Space Runtime URL and Repo URL ---
     space_id = os.getenv("SPACE_ID") # Get the SPACE_ID for sending link to the code
 
@@ -36,14 +33,15 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     api_url = DEFAULT_API_URL
     questions_url = f"{api_url}/questions"
+    files_url = f"{api_url}/files"
     submit_url = f"{api_url}/submit"
-
+    
     # 1. Instantiate Agent ( modify this part to create your agent)
-    try:
-        agent = BasicAgent()
-    except Exception as e:
-        print(f"Error instantiating agent: {e}")
-        return f"Error initializing agent: {e}", None
+    #try:
+    #    agent = BasicAgent()
+    #except Exception as e:
+    #    print(f"Error instantiating agent: {e}")
+    #    return f"Error initializing agent: {e}", None
     # In the case of an app running as a hugging Face space, this link points toward your codebase ( usefull for others so please keep it public)
     agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
     print(agent_code)
@@ -51,7 +49,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     # 2. Fetch Questions
     print(f"Fetching questions from: {questions_url}")
     try:
-        response = requests.get(questions_url, timeout=15)
+        response = requests.get(questions_url, timeout=60)
         response.raise_for_status()
         questions_data = response.json()
         if not questions_data:
@@ -80,7 +78,15 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
             print(f"Skipping item with missing task_id or question: {item}")
             continue
         try:
-            submitted_answer = agent(question_text)
+            file_url = f"{files_url}/{task_id}"
+            if "application/json" in requests.get(file_url).headers.get("Content-Type"):
+                file_url = None
+        
+            agent_output = asyncio.run(agent.main(question_text, file_url))
+            submitted_answer = str(agent_output)
+            if 'FINAL ANSWER:' in submitted_answer:
+                submitted_answer = submitted_answer.split('FINAL ANSWER:')[1].strip()
+
             answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
             results_log.append({"Task ID": task_id, "Question": question_text, "Submitted Answer": submitted_answer})
         except Exception as e:
@@ -146,11 +152,9 @@ with gr.Blocks() as demo:
     gr.Markdown(
         """
         **Instructions:**
-
         1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
         2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
         3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
-
         ---
         **Disclaimers:**
         Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
@@ -173,6 +177,7 @@ with gr.Blocks() as demo:
 
 if __name__ == "__main__":
     print("\n" + "-"*30 + " App Starting " + "-"*30)
+
     # Check for SPACE_HOST and SPACE_ID at startup for information
     space_host_startup = os.getenv("SPACE_HOST")
     space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
