@@ -3,23 +3,86 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Import your LangGraph agent
+from graph.graph_builder import graph
+from langchain_core.messages import HumanMessage
 
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
-# --- Basic Agent Definition ---
-# ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+# --- Your LangGraph Agent Definition ---
+# ----- THIS IS WHERE YOU BUILD YOUR AGENT ------
 class BasicAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+        """Initialize the LangGraph agent"""
+        print("LangGraph Agent initialized with multimodal, search, math, and YouTube tools.")
+        
+        # Verify environment variables
+        if not os.getenv("OPENROUTER_API_KEY"):
+            raise ValueError("OPENROUTER_API_KEY not found in environment variables")
+        
+        # The graph is already compiled and ready to use
+        self.graph = graph
+        print("✅ Agent ready with tools: multimodal, search, math, YouTube")
+    
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        """
+        Process a question using the LangGraph agent and return just the answer
+        
+        Args:
+            question: The question to answer
+            
+        Returns:
+            str: The final answer (formatted for evaluation)
+        """
+        print(f"🤖 Processing question: {question[:50]}...")
+        
+        try:
+            # Create initial state with the question
+            initial_state = {"messages": [HumanMessage(content=question)]}
+            
+            # Run the LangGraph agent
+            result = self.graph.invoke(initial_state)
+            
+            # Extract the final message content
+            final_message = result["messages"][-1]
+            answer = final_message.content
+            
+            # Clean up the answer for evaluation (remove any extra formatting)
+            # The evaluation system expects just the answer, no explanations
+            if isinstance(answer, str):
+                answer = answer.strip()
+                
+                # Remove common prefixes that might interfere with evaluation
+                prefixes_to_remove = [
+                    "The answer is: ",
+                    "Answer: ",
+                    "The result is: ",
+                    "Result: ",
+                    "The final answer is: ",
+                ]
+                
+                for prefix in prefixes_to_remove:
+                    if answer.startswith(prefix):
+                        answer = answer[len(prefix):].strip()
+                        break
+            
+            print(f"✅ Agent answer: {answer}")
+            return answer
+            
+        except Exception as e:
+            error_msg = f"Error processing question: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
 
-def run_and_submit_all( profile: gr.OAuthProfile | None):
+# Keep the rest of the file unchanged (run_and_submit_all function and Gradio interface)
+def run_and_submit_all(profile: gr.OAuthProfile | None):
     """
     Fetches all questions, runs the BasicAgent on them, submits all answers,
     and displays the results.
@@ -38,13 +101,14 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     questions_url = f"{api_url}/questions"
     submit_url = f"{api_url}/submit"
 
-    # 1. Instantiate Agent ( modify this part to create your agent)
+    # 1. Instantiate Agent (using your LangGraph agent)
     try:
         agent = BasicAgent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
-    # In the case of an app running as a hugging Face space, this link points toward your codebase ( usefull for others so please keep it public)
+    
+    # In the case of an app running as a hugging Face space, this link points toward your codebase
     agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
     print(agent_code)
 
@@ -61,10 +125,6 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     except requests.exceptions.RequestException as e:
         print(f"Error fetching questions: {e}")
         return f"Error fetching questions: {e}", None
-    except requests.exceptions.JSONDecodeError as e:
-         print(f"Error decoding JSON response from questions endpoint: {e}")
-         print(f"Response text: {response.text[:500]}")
-         return f"Error decoding server response for questions: {e}", None
     except Exception as e:
         print(f"An unexpected error occurred fetching questions: {e}")
         return f"An unexpected error occurred fetching questions: {e}", None
@@ -139,22 +199,26 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
         results_df = pd.DataFrame(results_log)
         return status_message, results_df
 
-
 # --- Build Gradio Interface using Blocks ---
 with gr.Blocks() as demo:
-    gr.Markdown("# Basic Agent Evaluation Runner")
+    gr.Markdown("# LangGraph Agent Evaluation Runner")
     gr.Markdown(
         """
         **Instructions:**
 
-        1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
-        2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
-        3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
+        This space uses a LangGraph agent with multimodal, search, math, and YouTube tools powered by OpenRouter.
+        
+        1.  Log in to your Hugging Face account using the button below.
+        2.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
 
+        **Agent Capabilities:**
+        - 🎨 **Multimodal**: Analyze images, extract text (OCR), process audio transcripts
+        - 🔍 **Search**: Web search using multiple providers (DuckDuckGo, Tavily, SerpAPI)
+        - 🧮 **Math**: Basic arithmetic, complex calculations, percentages, factorials
+        - 📺 **YouTube**: Extract captions, get video information
+        
         ---
-        **Disclaimers:**
-        Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
-        This space provides a basic setup and is intentionally sub-optimal to encourage you to develop your own, more robust solution. For instance for the delay process of the submit button, a solution could be to cache the answers and submit in a seperate action or even to answer the questions in async.
+        **Note:** Processing all questions may take some time as the agent carefully analyzes each question and uses appropriate tools.
         """
     )
 
@@ -163,7 +227,6 @@ with gr.Blocks() as demo:
     run_button = gr.Button("Run Evaluation & Submit All Answers")
 
     status_output = gr.Textbox(label="Run Status / Submission Result", lines=5, interactive=False)
-    # Removed max_rows=10 from DataFrame constructor
     results_table = gr.DataFrame(label="Questions and Agent Answers", wrap=True)
 
     run_button.click(
@@ -175,7 +238,7 @@ if __name__ == "__main__":
     print("\n" + "-"*30 + " App Starting " + "-"*30)
     # Check for SPACE_HOST and SPACE_ID at startup for information
     space_host_startup = os.getenv("SPACE_HOST")
-    space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
+    space_id_startup = os.getenv("SPACE_ID")
 
     if space_host_startup:
         print(f"✅ SPACE_HOST found: {space_host_startup}")
@@ -183,7 +246,7 @@ if __name__ == "__main__":
     else:
         print("ℹ️  SPACE_HOST environment variable not found (running locally?).")
 
-    if space_id_startup: # Print repo URLs if SPACE_ID is found
+    if space_id_startup:
         print(f"✅ SPACE_ID found: {space_id_startup}")
         print(f"   Repo URL: https://huggingface.co/spaces/{space_id_startup}")
         print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id_startup}/tree/main")
@@ -192,5 +255,5 @@ if __name__ == "__main__":
 
     print("-"*(60 + len(" App Starting ")) + "\n")
 
-    print("Launching Gradio Interface for Basic Agent Evaluation...")
+    print("Launching Gradio Interface for LangGraph Agent Evaluation...")
     demo.launch(debug=True, share=False)

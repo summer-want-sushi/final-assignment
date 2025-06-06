@@ -1,2 +1,13 @@
-gradio
+python-dotenv
 requests
+pytubefix
+pillow
+langgraph
+langchain
+langchain-openai
+langchain-core
+langchain-community
+gradio
+pandas
+gradio[oauth]
+
