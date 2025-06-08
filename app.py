@@ -1,8 +1,13 @@
 import os
 import gradio as gr
-import requests
 import inspect
 import pandas as pd
+import importlib
+from importlib import resources
+import requests
+import yaml
+import numpy as np
+from smolagents import CodeAgent, DuckDuckGoSearchTool, VisitWebpageTool, WikipediaSearchTool, Tool, OpenAIServerModel, SpeechToTextTool
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -10,14 +15,86 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
-class BasicAgent:
-    def __init__(self):
-        print("BasicAgent initialized.")
-    def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+
+
+
+
+
+class GetTaskFileTool(Tool):
+    name = "get_task_file_tool"
+    description = """This tool downloads the file content associated with the given task_id if exists. Returns absolute file path"""
+    inputs = {
+        "task_id": {"type": "string", "description": "Task id"},
+        "file_name": {"type": "string", "description": "File name"},
+    }
+    output_type = "string"
+
+    def forward(self, task_id: str, file_name: str) -> str:
+        response = requests.get(f"{DEFAULT_API_URL}/files/{task_id}", timeout=15)
+        response.raise_for_status()
+        with open(file_name, 'wb') as file:
+            file.write(response.content)
+        return os.path.abspath(file_name)
+
+class LoadXlsxFileTool(Tool):
+    name = "load_xlsx_file_tool"
+    description = """This tool loads xlsx file into pandas and returns it"""
+    inputs = {
+        "file_path": {"type": "string", "description": "File path"}
+    }
+    output_type = "object"
+
+    def forward(self, file_path: str) -> object:
+        return pd.read_excel(file_path)
+
+class LoadTextFileTool(Tool):
+    name = "load_text_file_tool"
+    description = """This tool loads any text file"""
+    inputs = {
+        "file_path": {"type": "string", "description": "File path"}
+    }
+    output_type = "string"
+
+    def forward(self, file_path: str) -> object:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
+
+prompts = yaml.safe_load(
+    resources.files("smolagents.prompts").joinpath("code_agent.yaml").read_text()
+)
+
+prompts["system_prompt"] = ("You are a general AI assistant. I will ask you a question. Report your thoughts, and finish your answer with the following template: FINAL ANSWER: [YOUR FINAL ANSWER]. YOUR FINAL ANSWER should be a number OR as few words as possible OR a comma separated list of numbers and/or strings. If you are asked for a number, don't use comma to write your number neither use units such as $ or percent sign unless specified otherwise. If you are asked for a string, don't use articles, neither abbreviations (e.g. for cities), and write the digits in plain text unless specified otherwise. If you are asked for a comma separated list, apply the above rules depending of whether the element to be put in the list is a number or a string. "
+                            + prompts["system_prompt"])
+
+def init_agent():
+    gemini_model = OpenAIServerModel(
+            model_id="deepseek-ai/DeepSeek-R1-0528",
+            api_base="https://llm.chutes.ai/v1",
+            api_key=os.getenv("CHUTES_API_KEY"),
+            temperature=0.7
+    )
+    agent = CodeAgent(
+        tools=[
+            DuckDuckGoSearchTool(),
+            VisitWebpageTool(),
+            WikipediaSearchTool(),
+            GetTaskFileTool(),
+            SpeechToTextTool(),
+            LoadXlsxFileTool(),
+            LoadTextFileTool()
+        ],
+        model=gemini_model,
+        prompt_templates=prompts,
+        max_steps=15,
+        additional_authorized_imports = ["pandas"]
+    )
+    return agent
+    
+    
+    
+    
+    
+    
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -40,7 +117,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
 
     # 1. Instantiate Agent ( modify this part to create your agent)
     try:
-        agent = BasicAgent()
+        agent = init_agent()
     except Exception as e:
         print(f"Error instantiating agent: {e}")
         return f"Error initializing agent: {e}", None
@@ -76,11 +153,18 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     for item in questions_data:
         task_id = item.get("task_id")
         question_text = item.get("question")
+        print(question_text)
+        file_name = item.get("file_name")
         if not task_id or question_text is None:
             print(f"Skipping item with missing task_id or question: {item}")
             continue
         try:
-            submitted_answer = agent(question_text)
+            submitted_answer = agent.run(f"Task id: {task_id}. Task file: {file_name if file_name != '' else 'is absent'}. Task: " + question_text)
+            if isinstance(submitted_answer, (np.integer, np.floating)):
+                submitted_answer = submitted_answer.item()  # Convert NumPy types to Python native types
+            elif isinstance(submitted_answer, list):
+                submitted_answer = [x.item() if isinstance(x, (np.integer, np.floating)) else x for x in submitted_answer]
+            submitted_answer = str(submitted_answer)
             answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
             results_log.append({"Task ID": task_id, "Question": question_text, "Submitted Answer": submitted_answer})
         except Exception as e:
@@ -146,11 +230,9 @@ with gr.Blocks() as demo:
     gr.Markdown(
         """
         **Instructions:**
-
         1.  Please clone this space, then modify the code to define your agent's logic, the tools, the necessary packages, etc ...
         2.  Log in to your Hugging Face account using the button below. This uses your HF username for submission.
         3.  Click 'Run Evaluation & Submit All Answers' to fetch questions, run your agent, submit answers, and see the score.
-
         ---
         **Disclaimers:**
         Once clicking on the "submit button, it can take quite some time ( this is the time for the agent to go through all the questions).
