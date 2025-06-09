@@ -1,2 +1,4 @@
 gradio
 requests
+ollama
+ollama pull minstrel
