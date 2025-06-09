@@ -10,6 +10,32 @@ DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
 # --- Basic Agent Definition ---
 # ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+try:
+    # 1. Extract the standard ML task (e.g., "text-classification")
+    task = extract_task(user_query)
+
+    # 2. Get relevant models for the task
+    models = scrape_huggingface_models(task)
+
+    if not models:
+        return f"❌ No models found for task `{task}`. Try refining your query."
+
+    # 3. Format response as a markdown table
+        response = f"### 🔍 Models for task: `{task}`\n\n"
+        response += "| Model Name | Task | Architecture |\n"
+        response += "|------------|------|---------------|\n"
+
+    for model in models:
+        name = model.get("model_name", "unknown")
+        task_name = model.get("task", "unknown")
+        arch = model.get("architecture", "unknown")
+        response += f"| [{name}](https://huggingface.co/{name}) | {task_name} | {arch} |\n"
+
+    return response
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
 class BasicAgent:
     def __init__(self):
         print("BasicAgent initialized.")
@@ -47,6 +73,28 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
     # In the case of an app running as a hugging Face space, this link points toward your codebase ( usefull for others so please keep it public)
     agent_code = f"https://huggingface.co/spaces/{space_id}/tree/main"
     print(agent_code)
+
+    # Gradio interface for deployment
+def gradio_ui():
+    with gr.Blocks() as demo:
+        gr.Markdown("# Hugging Face Model Finder Agent")
+        gr.Markdown("Enter a task description, and I'll find suitable ML models for you!")
+
+        # User input for task description
+        user_input = gr.Textbox(label="Describe the ML Task", placeholder="e.g., 'I need a text summarization model'", lines=2)
+
+        # Output for model search results
+        output = gr.Markdown()
+
+        # Connect the input/output to the agent
+        user_input.submit(run_agent, inputs=user_input, outputs=output)
+
+    return demo
+
+# Run the Gradio interface (will run locally, and can be deployed to Spaces)
+if __name__ == "__main__":
+    gradio_ui().launch()
+
 
     # 2. Fetch Questions
     print(f"Fetching questions from: {questions_url}")
