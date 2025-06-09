@@ -1,2 +1,13 @@
 gradio
 requests
+numpy
+huggingface_hub
+smolagents
+smolagents[openai]
+wikipedia-api
+transformers
+smolagents[transformers]
+smolagents[audio]
+openpyxl
+pyyaml[resolver]
+duckduckgo-search
