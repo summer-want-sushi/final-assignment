@@ -7,10 +7,12 @@ class GAIAAgent:
 
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        lower_q = question.lower()
-        if "reverse" in lower_q or "opposite" in lower_q:
+        reversed_response = reverse_string(question)
+        if reversed_response != "Could not detect a valid reverse task.":
             print("GAIAAgent using reverse_string tool.")
-            return reverse_string(question)
+            return reversed_response
+
+        lower_q = question.lower()
         if "vegetable" in lower_q or "veggie" in lower_q:
             print("GAIAAgent using filter_vegetables tool.")
             return filter_vegetables(question)
