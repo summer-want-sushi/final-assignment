@@ -1,2 +1,4 @@
 gradio
 requests
+wikipedia
+wikipedia-api
