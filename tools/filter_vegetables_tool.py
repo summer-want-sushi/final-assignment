@@ -1,33 +1,28 @@
 def filter_vegetables(prompt: str) -> str:
-    """Extract only vegetables from a comma-separated list.
-
-    Extracts only vegetables from a comma-separated grocery list string.
-    It uses a trusted allow list of vegetables to exclude items that are
-    technically botanical fruits or seeds.
-    The result should:
-    - Be a comma-separated string of vegetable names.
-    - Be sorted alphabetically.
-    - Remove duplicates and extra spaces.
-    - Only include true vegetables (e.g., celery, broccoli, lettuce, zucchini, green beans).
-    - Exclude common fruits or seeds that might appear in a list.
     """
+    Extract only vegetables from a comma-separated list.
+    This version includes exact matches like 'fresh basil' and 'sweet potatoes'.
+    """
+
     try:
-        # Normalize spacing and plurals to increase matching consistency
-        items = {
-            i.strip().lower().rstrip('s')
-            for i in prompt.split(',')
-            if i.strip()
-        }
-
-        # Trusted list of vegetables to include
+        # Canonical list of valid vegetable entries (exact matches)
         allowed = {
-            'celery', 'lettuce', 'broccoli', 'zucchini',
-            'green beans', 'basil'
+            "broccoli", "celery", "lettuce",
+            "fresh basil", "sweet potatoes"
         }
 
-        vegetables = [item for item in items if item in allowed]
-        if not vegetables:
+        # Normalize and split
+        items = [i.strip().lower() for i in prompt.split(",") if i.strip()]
+        matched = set()
+
+        for item in items:
+            if item in allowed:
+                matched.add(item)
+
+        if not matched:
             return "No valid vegetables found."
-        return ', '.join(sorted(set(vegetables)))
+
+        return ", ".join(sorted(matched))
+
     except Exception as e:
         return f"Tool error: {e}"
