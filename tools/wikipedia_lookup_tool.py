@@ -26,11 +26,8 @@ def lookup_wikipedia(query: str) -> str:
 
         lowered = query.lower()
         if "infobox" in lowered or "table" in lowered:
-            wiki_wiki = wikipediaapi.Wikipedia("en")
-            wiki_page = wiki_wiki.page(page.title)
-            if wiki_page.exists() and wiki_page.infobox:
-                info_lines = [f"{k}: {v}" for k, v in wiki_page.infobox.items()]
-                return "\n".join(info_lines)[:2000]
+            return "Structured infobox/table parsing not implemented in this version."
+
 
         summary = page.summary or page.content
         paragraphs = [p.strip() for p in summary.split("\n") if p.strip()]
